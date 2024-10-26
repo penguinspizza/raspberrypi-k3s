@@ -1,0 +1,40 @@
+common:                         # 全てのノードで共通の設定
+  username: pi                  # ユーザ名
+  password: raspberry           # パスワード
+master:                         # マスターノードの設定
+  hostname: rpm                 # ホスト名
+  internal:                     # クラスターネットワーク側の設定
+    ip: 192.168.50.1            # IPアドレス
+    netmask: 255.255.255.0      # サブネットマスク
+    mac: 00:00:00:00:00:00      # eth0のNICのMACアドレス
+    dhcpd:                      # DHCPサーバの設定
+      domain: rpicluster        # ドメイン名
+      range:                    # 払出しIPアドレスの範囲
+        start: 192.168.50.20    # 開始IPアドレス
+        end: 192.168.50.250     # 終了IPアドレス
+  external:                     # 外部ネットワーク側の設定
+    ip: 192.168.11.64           # IPアドレス
+    netmask: 255.255.255.0      # サブネットマスク
+    interface: enx000000000000  # enxから始まるNICのMACアドレス
+workers:                        # ワーカーノードの設定
+- hostname: rp1                 # ホスト名
+  ip: 192.168.50.11             # IPアドレス
+  mac: 00:00:00:00:00:01        # eth0のNICのMACアドレス
+- hostname: rp2
+  ip: 192.168.50.12
+  mac: 00:00:00:00:00:02
+- hostname: rp3
+  ip: 192.168.50.13
+  mac: 00:00:00:00:00:03
+- hostname: rp4
+  ip: 192.168.50.14
+  mac: 00:00:00:00:00:04
+- hostname: rp5
+  ip: 192.168.50.15
+  mac: 00:00:00:00:00:05
+- hostname: rp6
+  ip: 192.168.50.16
+  mac: 00:00:00:00:00:06
+- hostname: rp7
+  ip: 192.168.50.17
+  mac: 00:00:00:00:00:07
