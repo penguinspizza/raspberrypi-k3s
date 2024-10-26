@@ -1,0 +1,6 @@
+#!/bin/bash
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--write-kubeconfig-mode 644 --node-ip {{ master.internal.ip }} --node-external-ip {{ master.external.ip }} --flannel-iface=eth0 --token {{ generated_token }}" sh -
+mkdir -p /home/{{ common.username }}/.kube
+cp /etc/rancher/k3s/k3s.yaml /home/{{ common.username }}/.kube/config
+chown -R {{ common.username }}:{{ common.username }} /home/{{ common.username }}/
+

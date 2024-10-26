@@ -1,0 +1,13 @@
+network:
+  version: 2
+
+  ethernets:
+    eth0:
+      addresses:
+      - {{ master.internal.ip }}/{{ master.internal.netmask | netmask_to_cidr }}
+      dhcp4: false
+      optional: false
+    {{ master.external.interface }}:
+      dhcp4: true
+      optional: {% if not manual_link_up %}false{% else %}true{% endif %}
+

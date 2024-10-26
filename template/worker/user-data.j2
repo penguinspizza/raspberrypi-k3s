@@ -1,0 +1,46 @@
+#cloud-config
+hostname: {{ worker.hostname }}
+manage_etc_hosts: false
+packages:
+- avahi-daemon
+apt:
+  conf: |
+    Acquire {
+      Check-Date "false";
+    };
+
+users:
+- name: {{ common.username }}
+  groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+  shell: /bin/bash
+  lock_passwd: false
+  passwd: {{ common.hashed_password }}
+  ssh_authorized_keys:
+    - {{ worker.ssh_authorized_keys }} {{ common.username }}@{{ master.hostname }}
+  sudo: ALL=(ALL) NOPASSWD:ALL
+
+write_files:
+- path: /etc/hosts
+  content: |
+    127.0.0.1       localhost
+    ::1             localhost ip6-localhost ip6-loopback
+    ff02::1         ip6-allnodes
+    ff02::2         ip6-allrouters
+
+    127.0.1.1	{{ worker.hostname }}
+
+    {{ master.internal.ip }}	{{ master.hostname }}
+    {% for worker in workers %}
+    {{ worker.ip }}	{{ worker.hostname }}{% endfor %}
+- path: /etc/ssh/sshd_config.d/01-cloud-init-custom-sshd.conf
+  content: |
+    PubkeyAuthentication yes
+    PasswordAuthentication yes
+    PermitEmptyPasswords no
+
+timezone: Asia/Tokyo
+runcmd:
+- localectl set-x11-keymap "jp" pc105
+- setupcon -k --force || true
+- curl -sfL https://get.k3s.io | K3S_URL=https://{{ master.internal.ip }}:6443 K3S_TOKEN={{ generated_token }} INSTALL_K3S_EXEC="--node-ip {{ worker.ip }} --flannel-iface=eth0" sh -
+

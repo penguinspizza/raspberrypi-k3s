@@ -1,0 +1,114 @@
+#cloud-config
+hostname: {{ master.hostname }}
+manage_etc_hosts: false{% if not manual_link_up %}
+packages:
+- avahi-daemon
+- isc-dhcp-server{% endif %}
+apt:
+  conf: |
+    Acquire {
+      Check-Date "false";
+    };
+
+users:
+- name: {{ common.username }}
+  groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+  shell: /bin/bash
+  lock_passwd: false
+  passwd: {{ common.hashed_password }}
+  sudo: ALL=(ALL) NOPASSWD:ALL
+
+write_files:
+- path: /etc/dhcp/dhcpd.conf
+  content: |
+    ddns-update-style none;
+    authoritative;
+    log-facility local7;
+
+    # No service will be given on this subnet
+    subnet {{ master.external.network_address }} netmask {{ master.external.netmask }} {
+    }
+
+    # The internal {{ master.internal.dhcpd.domain }} network
+    group {
+      option broadcast-address {{ master.internal.broadcast_address }};
+      option routers {{ master.internal.ip }};
+      default-lease-time 600;
+      max-lease-time 7200;
+      option domain-name "{{ master.internal.dhcpd.domain }}";
+      option domain-name-servers 8.8.8.8, 8.8.4.4;
+      subnet {{ master.internal.network_address }} netmask {{ master.internal.netmask }} {
+        range {{ master.internal.dhcpd.range.start }} {{ master.internal.dhcpd.range.end }};
+
+        # Head Node
+        host {{ master.hostname }} {
+          hardware ethernet {{ master.internal.mac }};
+          fixed-address {{ master.internal.ip }};
+          option host-name "{{ master.hostname }}";
+        }{% for worker in workers %}
+
+        host {{ worker.hostname }} {
+          hardware ethernet {{ worker.mac }};
+          fixed-address {{ worker.ip }};
+          option host-name "{{ worker.hostname }}";
+        }{% endfor %}
+      }
+    }
+- path: /etc/default/isc-dhcp-server
+  content: |
+    DHCPDv4_CONF=/etc/dhcp/dhcpd.conf
+    DHCPDv4_PID=/var/run/dhcpd.pid
+    INTERFACESv4="eth0"
+    INTERFACESv6=""
+- path: /etc/hosts
+  content: |
+    127.0.0.1       localhost
+    ::1             localhost ip6-localhost ip6-loopback
+    ff02::1         ip6-allnodes
+    ff02::2         ip6-allrouters
+
+    127.0.1.1	{{ master.hostname }}
+
+    {{ master.internal.ip }}	{{ master.hostname }}
+    {% for worker in workers %}
+    {{ worker.ip }}	{{ worker.hostname }}{% endfor %}
+- path: /etc/sysctl.conf
+  content: |
+    net.ipv4.ip_forward=1
+- path: /etc/iptables.ipv4.nat
+  content: |
+    *nat
+    :PREROUTING ACCEPT [0:0]
+    :INPUT ACCEPT [0:0]
+    :OUTPUT ACCEPT [0:0]
+    :POSTROUTING ACCEPT [0:0]
+    -A POSTROUTING -o {{ master.external.interface }} -j MASQUERADE
+    COMMIT
+    *filter
+    :INPUT ACCEPT [0:0]
+    :FORWARD ACCEPT [0:0]
+    :OUTPUT ACCEPT [0:0]
+    -A FORWARD -i {{ master.external.interface }} -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+    -A FORWARD -i eth0 -o {{ master.external.interface }} -j ACCEPT
+    COMMIT
+- path: /etc/rc.local
+  content: |
+    #!/bin/bash
+    iptables-restore < /etc/iptables.ipv4.nat
+    exit 0
+  permissions: '0755'
+- path: /home/{{ common.username }}/.ssh/id_ed25519
+  content: |
+{{ generated_key | indent(4, true) }}  permissions: '0600'
+
+timezone: Asia/Tokyo
+runcmd:
+- localectl set-x11-keymap "jp" pc105
+- setupcon -k --force || true
+- chmod 0700 /home/{{ common.username }}/.ssh{% if not manual_link_up %}
+- curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--write-kubeconfig-mode 644 --node-ip {{ master.internal.ip }} --node-external-ip {{ master.external.ip }} --flannel-iface=eth0 --token {{ generated_token }}" sh -
+- mkdir -p /home/{{ common.username }}/.kube
+- cp /etc/rancher/k3s/k3s.yaml /home/{{ common.username }}/.kube/config{% endif %}
+- chown -R {{ common.username }}:{{ common.username }} /home/{{ common.username }}/{% if not manual_link_up %}
+- reboot{% endif %}
+
