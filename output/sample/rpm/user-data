@@ -1,0 +1,155 @@
+#cloud-config
+hostname: rpm
+manage_etc_hosts: false
+apt:
+  conf: |
+    Acquire {
+      Check-Date "false";
+    };
+
+users:
+- name: pi
+  groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+  shell: /bin/bash
+  lock_passwd: false
+  passwd: $5$cWkpOIlhCc0v9UVA$SY7KzSY0f6RLbn.86cQbtGD2OmZ35.Db15a2289oxm1
+  sudo: ALL=(ALL) NOPASSWD:ALL
+
+write_files:
+- path: /etc/dhcp/dhcpd.conf
+  content: |
+    ddns-update-style none;
+    authoritative;
+    log-facility local7;
+
+    # No service will be given on this subnet
+    subnet 192.168.11.0 netmask 255.255.255.0 {
+    }
+
+    # The internal rpicluster network
+    group {
+      option broadcast-address 192.168.50.255;
+      option routers 192.168.50.1;
+      default-lease-time 600;
+      max-lease-time 7200;
+      option domain-name "rpicluster";
+      option domain-name-servers 8.8.8.8, 8.8.4.4;
+      subnet 192.168.50.0 netmask 255.255.255.0 {
+        range 192.168.50.20 192.168.50.250;
+
+        # Head Node
+        host rpm {
+          hardware ethernet 00:00:00:00:00:00;
+          fixed-address 192.168.50.1;
+          option host-name "rpm";
+        }
+
+        host rp1 {
+          hardware ethernet 00:00:00:00:00:01;
+          fixed-address 192.168.50.11;
+          option host-name "rp1";
+        }
+
+        host rp2 {
+          hardware ethernet 00:00:00:00:00:02;
+          fixed-address 192.168.50.12;
+          option host-name "rp2";
+        }
+
+        host rp3 {
+          hardware ethernet 00:00:00:00:00:03;
+          fixed-address 192.168.50.13;
+          option host-name "rp3";
+        }
+
+        host rp4 {
+          hardware ethernet 00:00:00:00:00:04;
+          fixed-address 192.168.50.14;
+          option host-name "rp4";
+        }
+
+        host rp5 {
+          hardware ethernet 00:00:00:00:00:05;
+          fixed-address 192.168.50.15;
+          option host-name "rp5";
+        }
+
+        host rp6 {
+          hardware ethernet 00:00:00:00:00:06;
+          fixed-address 192.168.50.16;
+          option host-name "rp6";
+        }
+
+        host rp7 {
+          hardware ethernet 00:00:00:00:00:07;
+          fixed-address 192.168.50.17;
+          option host-name "rp7";
+        }
+      }
+    }
+- path: /etc/default/isc-dhcp-server
+  content: |
+    DHCPDv4_CONF=/etc/dhcp/dhcpd.conf
+    DHCPDv4_PID=/var/run/dhcpd.pid
+    INTERFACESv4="eth0"
+    INTERFACESv6=""
+- path: /etc/hosts
+  content: |
+    127.0.0.1       localhost
+    ::1             localhost ip6-localhost ip6-loopback
+    ff02::1         ip6-allnodes
+    ff02::2         ip6-allrouters
+
+    127.0.1.1	rpm
+
+    192.168.50.1	rpm
+    
+    192.168.50.11	rp1
+    192.168.50.12	rp2
+    192.168.50.13	rp3
+    192.168.50.14	rp4
+    192.168.50.15	rp5
+    192.168.50.16	rp6
+    192.168.50.17	rp7
+- path: /etc/sysctl.conf
+  content: |
+    net.ipv4.ip_forward=1
+- path: /etc/iptables.ipv4.nat
+  content: |
+    *nat
+    :PREROUTING ACCEPT [0:0]
+    :INPUT ACCEPT [0:0]
+    :OUTPUT ACCEPT [0:0]
+    :POSTROUTING ACCEPT [0:0]
+    -A POSTROUTING -o enx000000000000 -j MASQUERADE
+    COMMIT
+    *filter
+    :INPUT ACCEPT [0:0]
+    :FORWARD ACCEPT [0:0]
+    :OUTPUT ACCEPT [0:0]
+    -A FORWARD -i enx000000000000 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+    -A FORWARD -i eth0 -o enx000000000000 -j ACCEPT
+    COMMIT
+- path: /etc/rc.local
+  content: |
+    #!/bin/bash
+    iptables-restore < /etc/iptables.ipv4.nat
+    exit 0
+  permissions: '0755'
+- path: /home/pi/.ssh/id_ed25519
+  content: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUx
+    OQAAACDdHRz9NO+Zq0QkI8lRBdULJeGolhnHbpA+GJwN/HQYvwAAAIgACmyvAApsrwAAAAtzc2gt
+    ZWQyNTUxOQAAACDdHRz9NO+Zq0QkI8lRBdULJeGolhnHbpA+GJwN/HQYvwAAAEDoeftreAv02ra/
+    Fh2qezyIKTqps2KNI6LAPi3St0xQR90dHP0075mrRCQjyVEF1Qsl4aiWGcdukD4YnA38dBi/AAAA
+    AAECAwQF
+    -----END OPENSSH PRIVATE KEY-----
+  permissions: '0600'
+
+timezone: Asia/Tokyo
+runcmd:
+- localectl set-x11-keymap "jp" pc105
+- setupcon -k --force || true
+- chmod 0700 /home/pi/.ssh
+- chown -R pi:pi /home/pi/

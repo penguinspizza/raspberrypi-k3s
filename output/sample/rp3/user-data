@@ -1,0 +1,51 @@
+#cloud-config
+hostname: rp3
+manage_etc_hosts: false
+packages:
+- avahi-daemon
+apt:
+  conf: |
+    Acquire {
+      Check-Date "false";
+    };
+
+users:
+- name: pi
+  groups: users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+  shell: /bin/bash
+  lock_passwd: false
+  passwd: $5$cWkpOIlhCc0v9UVA$SY7KzSY0f6RLbn.86cQbtGD2OmZ35.Db15a2289oxm1
+  ssh_authorized_keys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN0dHP0075mrRCQjyVEF1Qsl4aiWGcdukD4YnA38dBi/ pi@rpm
+  sudo: ALL=(ALL) NOPASSWD:ALL
+
+write_files:
+- path: /etc/hosts
+  content: |
+    127.0.0.1       localhost
+    ::1             localhost ip6-localhost ip6-loopback
+    ff02::1         ip6-allnodes
+    ff02::2         ip6-allrouters
+
+    127.0.1.1	rp3
+
+    192.168.50.1	rpm
+    
+    192.168.50.11	rp1
+    192.168.50.12	rp2
+    192.168.50.13	rp3
+    192.168.50.14	rp4
+    192.168.50.15	rp5
+    192.168.50.16	rp6
+    192.168.50.17	rp7
+- path: /etc/ssh/sshd_config.d/01-cloud-init-custom-sshd.conf
+  content: |
+    PubkeyAuthentication yes
+    PasswordAuthentication yes
+    PermitEmptyPasswords no
+
+timezone: Asia/Tokyo
+runcmd:
+- localectl set-x11-keymap "jp" pc105
+- setupcon -k --force || true
+- curl -sfL https://get.k3s.io | K3S_URL=https://192.168.50.1:6443 K3S_TOKEN=EvPpHp6pic4KDn5titE4q0qcqiRE/iDwECorNnAegBk= INSTALL_K3S_EXEC="--node-ip 192.168.50.13 --flannel-iface=eth0" sh -
